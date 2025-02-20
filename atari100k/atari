@@ -1,5 +1,5 @@
 # 使用 NVIDIA CUDA 11.7.1 作为基础镜像
-FROM nvidia/cuda:11.7.1-cudnn8-devel-ubuntu22.04
+FROM docker.io/nvidia/cuda:11.7.1-cudnn8-devel-ubuntu22.04
 
 # 设置非交互模式，防止 apt-get 交互
 ENV DEBIAN_FRONTEND=noninteractive
