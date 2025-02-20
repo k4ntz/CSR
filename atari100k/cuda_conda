@@ -12,21 +12,30 @@ ENV PATH="/opt/conda/bin:$PATH"
 RUN conda create -n atari python=3.9.12
 
 SHELL ["/bin/bash", "-c"]
-RUN source activate atari && \
+RUN conda init bash && \
+    echo "conda activate atari" >> ~/.bashrc && \
+    bash -c "source ~/.bashrc && \
     apt update && apt install -y software-properties-common && \
     add-apt-repository ppa:deadsnakes/ppa -y && \
-    apt update
+    apt update"
 
-RUN source activate atari && \
+RUN conda init bash && \
+    echo "conda activate atari" >> ~/.bashrc && \
+    bash -c "source ~/.bashrc && \
     apt install -y build-essential cmake zlib1g-dev libjpeg-dev \
     python3.9-dev libsdl1.2-dev libsdl-image1.2-dev \
     libsdl-mixer1.2-dev libsdl-ttf2.0-dev \
     libsmpeg-dev libportmidi-dev libswscale-dev \
-    libavformat-dev libavcodec-dev
+    libavformat-dev libavcodec-dev"
 
-RUN source activate atari && \
-    pip install ale-py==0.7 atari-py==0.2.5 && \
-    conda install -y -c conda-forge gym==0.19.0
+RUN conda init bash && \
+    echo "conda activate atari" >> ~/.bashrc && \
+    bash -c "source ~/.bashrc && \
+    pip install ale-py==0.9.0 && \
+    pip install atari-py==0.2.5"
+
+WORKDIR /app
+RUN git clone https://github.com/k4ntz/CSR.git 
 
 RUN echo "source activate atari" >> ~/.bashrc
 CMD ["bash"]
