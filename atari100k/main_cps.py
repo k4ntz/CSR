@@ -326,7 +326,7 @@ def gen_across_tasks(config, idx, manager):
             torch.cuda.set_rng_state_all(checkpoint["torch_cuda_random_state"])
         # 恢复超参数
         if "hyperparameters" in checkpoint:
-            config.learning_rate = checkpoint["hyperparameters"].get("learning_rate", config.learning_rate)
+            config.learning_rate = checkpoint["hyperparameters"].get("learning_rate", config.model_lr)
             if hasattr(agent, "epsilon"):
                 agent.epsilon = checkpoint["hyperparameters"].get("epsilon", agent.epsilon)
 
