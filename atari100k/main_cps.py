@@ -423,7 +423,7 @@ def gen_across_tasks(config, idx, manager):
             "optims_state_dict": tools.recursively_collect_optim_state_dict(agent),  # 优化器
             "step": agent._step,  # 训练步数
             "hyperparameters": {  # 记录超参数
-                "learning_rate": config.learning_rate,
+                "learning_rate": config.model_lr,
                 "epsilon": getattr(agent, "epsilon", None),  # DQN 需要保存 epsilon
             },
         }
