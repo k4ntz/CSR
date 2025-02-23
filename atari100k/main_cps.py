@@ -316,7 +316,14 @@ def gen_across_tasks(config, idx, manager):
         agent.load_state_dict(checkpoint["agent_state_dict"])
         tools.recursively_load_optim_state_dict(agent, checkpoint["optims_state_dict"])
         agent._step = checkpoint.get("step", 0)  # 恢复训练步数
-
+        
+        # ✅ 恢复随机状态
+        if "numpy_random_state" in checkpoint:
+            np.random.set_state(checkpoint["numpy_random_state"])
+        if "torch_random_state" in checkpoint:
+            torch.set_rng_state(checkpoint["torch_random_state"])
+        if "torch_cuda_random_state" in checkpoint and torch.cuda.is_available():
+            torch.cuda.set_rng_state_all(checkpoint["torch_cuda_random_state"])
         # 恢复超参数
         if "hyperparameters" in checkpoint:
             config.learning_rate = checkpoint["hyperparameters"].get("learning_rate", config.learning_rate)
@@ -426,6 +433,10 @@ def gen_across_tasks(config, idx, manager):
                 "learning_rate": config.model_lr,
                 "epsilon": getattr(agent, "epsilon", None),  # DQN 需要保存 epsilon
             },
+            # ✅ 保存随机状态
+            "numpy_random_state": np.random.get_state(),
+            "torch_random_state": torch.get_rng_state(),
+            "torch_cuda_random_state": torch.cuda.get_rng_state_all() if torch.cuda.is_available() else None,            
         }
 
         # 如果使用经验回放缓冲区（DQN/SAC）
