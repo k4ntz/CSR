@@ -343,6 +343,7 @@ def gen_across_tasks(config, idx, manager):
             train_envs[0].load_state(checkpoint["env_state"])
 
         print(f"🔄 Checkpoint loaded, resuming from step {agent._step}")
+        checkpoint_files = []  # 重置为空的检查点列表
     else:
         print("⚠️ No checkpoint found, starting training from scratch.")    
     
@@ -396,14 +397,30 @@ def gen_across_tasks(config, idx, manager):
         logger.write()
         # ✅ 更新 RTPT 进度
         rtpt.step(subtitle=f"Step: {agent._step}")
-        # ✅ 如果已经加载了 Checkpoint，就跳过存储
-        if checkpoint_files:  
-            print("🔄 Checkpoint already loaded, skipping save step.")
-        else:
-            if agent._step % 50000 == 0:  #save Checkpoint every 50,000 steps
+        
+        if agent._step % 50000 == 0:
+            # 动态检查当前目录中的检查点文件
+            current_checkpoints = sorted(logdir.glob("checkpoint_*.pth"), key=lambda x: x.stat().st_mtime)
+            if not current_checkpoints:
+                # 首次运行，无检查点时保存
                 checkpoint_path = logdir / f"checkpoint_{agent._step}.pth"
                 torch.save(items_to_save, checkpoint_path)
                 print(f"✅ Saved checkpoint at {checkpoint_path}")
+            else:
+                # 后续运行，允许保存新检查点
+                checkpoint_path = logdir / f"checkpoint_{agent._step}.pth"
+                torch.save(items_to_save, checkpoint_path)
+                print(f"✅ Saved checkpoint at {checkpoint_path}")
+
+            # 清理旧检查点（保留最近的5个）
+            checkpoint_files = sorted(logdir.glob("checkpoint_*.pth"), key=lambda x: x.stat().st_mtime, reverse=True)
+            if len(checkpoint_files) > 5:
+                for old_checkpoint in checkpoint_files[5:]:
+                    try:
+                        os.remove(old_checkpoint)
+                        print(f"🧹 Deleted old checkpoint: {old_checkpoint}")
+                    except Exception as e:
+                        print(f"Failed to delete {old_checkpoint}: {str(e)}")
 
 
         if config.eval_episode_num > 0:
