@@ -3,6 +3,7 @@ import functools
 import os
 import pathlib
 import sys
+from rtpt import RTPT
 
 os.environ["MUJOCO_GL"] = "osmesa"
 
@@ -226,6 +227,9 @@ def gen_across_tasks(config, idx, manager):
         config.game_difficulty = rng.choice(allow_diff_dict[config.task])
 
     print("Logdir", logdir)
+    # ✅ 创建 RTPT 对象
+    rtpt = RTPT(name_initials='Liu', experiment_name=f'{config.task}', max_iterations=config.steps)
+    rtpt.start()
     logdir.mkdir(parents=True, exist_ok=True)
     config.traindir.mkdir(parents=True, exist_ok=True)
     config.evaldir.mkdir(parents=True, exist_ok=True)
@@ -345,7 +349,7 @@ def gen_across_tasks(config, idx, manager):
     if manager.tau is not None:
         print("Start determining whether to adapt or to expand.")
         while agent._step <= config.pred_steps:
-            logger.write()            
+            logger.write()
             state = tools.simulate(
                 agent,
                 train_envs,
@@ -390,6 +394,8 @@ def gen_across_tasks(config, idx, manager):
     
     while agent._step < config.pred_steps + config.steps + config.eval_every:
         logger.write()
+        # ✅ 更新 RTPT 进度
+        rtpt.step(subtitle=f"Step: {agent._step}")
         # ✅ 如果已经加载了 Checkpoint，就跳过存储
         if checkpoint_files:  
             print("🔄 Checkpoint already loaded, skipping save step.")
