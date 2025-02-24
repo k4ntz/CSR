@@ -196,7 +196,7 @@ def gen_across_tasks(config, idx, manager):
         tools.enable_deterministic_run()
     up_logdir = pathlib.Path(config.logdir).expanduser()
     logdir = pathlib.Path(config.logdir + '/task{}'.format(idx + 1)).expanduser()
-
+    checkpoint_files = sorted(logdir.glob("checkpoint_*.pth"), key=os.path.getmtime, reverse=True)
     config.traindir = config.traindir or logdir / "train_eps"
     config.evaldir = config.evaldir or logdir / "eval_eps"
     config.steps //= config.action_repeat
@@ -233,6 +233,7 @@ def gen_across_tasks(config, idx, manager):
     logdir.mkdir(parents=True, exist_ok=True)
     config.traindir.mkdir(parents=True, exist_ok=True)
     config.evaldir.mkdir(parents=True, exist_ok=True)
+    
     if checkpoint_files:
         step = agent._step  # 从检查点中恢复的步数
     else:
@@ -345,7 +346,6 @@ def gen_across_tasks(config, idx, manager):
             train_envs[0].load_state(checkpoint["env_state"])
 
         print(f"🔄 Checkpoint loaded, resuming from step {agent._step}")
-        checkpoint_files = []  # 重置为空的检查点列表
     else:
         print("⚠️ No checkpoint found, starting training from scratch.")    
     
@@ -403,16 +403,17 @@ def gen_across_tasks(config, idx, manager):
         if agent._step % 50000 == 0:
             # 动态检查当前目录中的检查点文件
             current_checkpoints = sorted(logdir.glob("checkpoint_*.pth"), key=lambda x: x.stat().st_mtime)
-            if not current_checkpoints:
-                # 首次运行，无检查点时保存
-                checkpoint_path = logdir / f"checkpoint_{agent._step}.pth"
-                torch.save(items_to_save, checkpoint_path)
-                print(f"✅ Saved checkpoint at {checkpoint_path}")
-            else:
-                # 后续运行，允许保存新检查点
-                checkpoint_path = logdir / f"checkpoint_{agent._step}.pth"
-                torch.save(items_to_save, checkpoint_path)
-                print(f"✅ Saved checkpoint at {checkpoint_path}")
+            checkpoint_path = logdir / f"checkpoint_{agent._step}.pth"
+            torch.save(items_to_save, checkpoint_path)
+            print(f"✅ Saved checkpoint at {checkpoint_path}")
+            
+            if len(current_checkpoints) >= 5:
+                for old_checkpoint in current_checkpoints[5:]:
+                    try:
+                        os.remove(old_checkpoint)
+                        print(f"🧹 Deleted old checkpoint: {old_checkpoint}")
+                    except Exception as e:
+                        print(f"删除失败: {old_checkpoint} - {str(e)}")
 
             # 清理旧检查点（保留最近的5个）
             checkpoint_files = sorted(logdir.glob("checkpoint_*.pth"), key=lambda x: x.stat().st_mtime, reverse=True)
