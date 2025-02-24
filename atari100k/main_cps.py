@@ -233,8 +233,10 @@ def gen_across_tasks(config, idx, manager):
     logdir.mkdir(parents=True, exist_ok=True)
     config.traindir.mkdir(parents=True, exist_ok=True)
     config.evaldir.mkdir(parents=True, exist_ok=True)
-    step = count_steps(config.traindir)
-    # step in logger is environmental step
+    if checkpoint_files:
+        step = agent._step  # 从检查点中恢复的步数
+    else:
+        step = count_steps(config.traindir)  # 首次运行的步数
     logger = tools.Logger(logdir, config.action_repeat * step)
 
     print("Create envs.")
@@ -320,7 +322,7 @@ def gen_across_tasks(config, idx, manager):
         agent.load_state_dict(checkpoint["agent_state_dict"])
         tools.recursively_load_optim_state_dict(agent, checkpoint["optims_state_dict"])
         agent._step = checkpoint.get("step", 0)  # 恢复训练步数
-        
+        logger.step = config.action_repeat * agent._step # 同步更新 logger 的步数
         # ✅ 恢复随机状态
         if "numpy_random_state" in checkpoint:
             np.random.set_state(checkpoint["numpy_random_state"])
