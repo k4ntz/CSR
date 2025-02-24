@@ -393,7 +393,7 @@ def gen_across_tasks(config, idx, manager):
         # ✅ 如果已经加载了 Checkpoint，就跳过存储
         if checkpoint_files:  
             print("🔄 Checkpoint already loaded, skipping save step.")
-        else：
+        else:
             if agent._step % 50000 == 0:  #save Checkpoint every 50,000 steps
                 checkpoint_path = logdir / f"checkpoint_{agent._step}.pth"
                 torch.save(items_to_save, checkpoint_path)
