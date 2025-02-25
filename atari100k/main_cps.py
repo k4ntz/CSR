@@ -3,7 +3,6 @@ import functools
 import os
 import pathlib
 import sys
-from rtpt import RTPT
 
 os.environ["MUJOCO_GL"] = "osmesa"
 
@@ -196,7 +195,7 @@ def gen_across_tasks(config, idx, manager):
         tools.enable_deterministic_run()
     up_logdir = pathlib.Path(config.logdir).expanduser()
     logdir = pathlib.Path(config.logdir + '/task{}'.format(idx + 1)).expanduser()
-    checkpoint_files = sorted(logdir.glob("checkpoint_*.pth"), key=os.path.getmtime, reverse=True)
+
     config.traindir = config.traindir or logdir / "train_eps"
     config.evaldir = config.evaldir or logdir / "eval_eps"
     config.steps //= config.action_repeat
@@ -227,17 +226,11 @@ def gen_across_tasks(config, idx, manager):
         config.game_difficulty = rng.choice(allow_diff_dict[config.task])
 
     print("Logdir", logdir)
-    # ✅ 创建 RTPT 对象
-    rtpt = RTPT(name_initials='Liu', experiment_name=f'{config.task}', max_iterations=config.steps)
-    rtpt.start()
     logdir.mkdir(parents=True, exist_ok=True)
     config.traindir.mkdir(parents=True, exist_ok=True)
     config.evaldir.mkdir(parents=True, exist_ok=True)
-    
-    if checkpoint_files:
-        step = agent._step  # 从检查点中恢复的步数
-    else:
-        step = count_steps(config.traindir)  # 首次运行的步数
+    step = count_steps(config.traindir)
+    # step in logger is environmental step
     logger = tools.Logger(logdir, config.action_repeat * step)
 
     print("Create envs.")
@@ -323,7 +316,7 @@ def gen_across_tasks(config, idx, manager):
         agent.load_state_dict(checkpoint["agent_state_dict"])
         tools.recursively_load_optim_state_dict(agent, checkpoint["optims_state_dict"])
         agent._step = checkpoint.get("step", 0)  # 恢复训练步数
-        logger.step = config.action_repeat * agent._step # 同步更新 logger 的步数
+        
         # ✅ 恢复随机状态
         if "numpy_random_state" in checkpoint:
             np.random.set_state(checkpoint["numpy_random_state"])
@@ -352,7 +345,7 @@ def gen_across_tasks(config, idx, manager):
     if manager.tau is not None:
         print("Start determining whether to adapt or to expand.")
         while agent._step <= config.pred_steps:
-            logger.write()
+            logger.write()            
             state = tools.simulate(
                 agent,
                 train_envs,
@@ -397,33 +390,14 @@ def gen_across_tasks(config, idx, manager):
     
     while agent._step < config.pred_steps + config.steps + config.eval_every:
         logger.write()
-        # ✅ 更新 RTPT 进度
-        rtpt.step(subtitle=f"Step: {agent._step}")
-        
-        if agent._step % 50000 == 0:
-            # 动态检查当前目录中的检查点文件
-            current_checkpoints = sorted(logdir.glob("checkpoint_*.pth"), key=lambda x: x.stat().st_mtime)
-            checkpoint_path = logdir / f"checkpoint_{agent._step}.pth"
-            torch.save(items_to_save, checkpoint_path)
-            print(f"✅ Saved checkpoint at {checkpoint_path}")
-            
-            if len(current_checkpoints) >= 5:
-                for old_checkpoint in current_checkpoints[5:]:
-                    try:
-                        os.remove(old_checkpoint)
-                        print(f"🧹 Deleted old checkpoint: {old_checkpoint}")
-                    except Exception as e:
-                        print(f"删除失败: {old_checkpoint} - {str(e)}")
-
-            # 清理旧检查点（保留最近的5个）
-            checkpoint_files = sorted(logdir.glob("checkpoint_*.pth"), key=lambda x: x.stat().st_mtime, reverse=True)
-            if len(checkpoint_files) > 5:
-                for old_checkpoint in checkpoint_files[5:]:
-                    try:
-                        os.remove(old_checkpoint)
-                        print(f"🧹 Deleted old checkpoint: {old_checkpoint}")
-                    except Exception as e:
-                        print(f"Failed to delete {old_checkpoint}: {str(e)}")
+        # ✅ 如果已经加载了 Checkpoint，就跳过存储
+        if checkpoint_files:  
+            print("🔄 Checkpoint already loaded, skipping save step.")
+        else:
+            if agent._step % 50000 == 0:  #save Checkpoint every 50,000 steps
+                checkpoint_path = logdir / f"checkpoint_{agent._step}.pth"
+                torch.save(items_to_save, checkpoint_path)
+                print(f"✅ Saved checkpoint at {checkpoint_path}")
 
 
         if config.eval_episode_num > 0:
