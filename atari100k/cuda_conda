@@ -40,8 +40,10 @@ RUN git clone https://github.com/k4ntz/CSR.git
 RUN echo "source activate atari" >> ~/.bashrc
 CMD ["bash"]
 
+#PLEASE run the following commands to build the entire environment
 #podman build -t atari -f cuda_conda . #build image atari
 #podman run -it --name conda --device nvidia.com/gpu=all atari bash #create container conda
 #conda install conda-forge::gym==0.19.0
 #pip install pip==23.3
+#cd CSR/atari100k
 #pip install -r requirements.txt
